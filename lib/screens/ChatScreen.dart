@@ -1,261 +1,389 @@
+import 'dart:ui';
+
+import 'package:contacts_service/contacts_service.dart';
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl/intl.dart';
-import 'package:sms_spam_detection/Models/Thread.dart';
-import 'package:sms_spam_detection/Models/user_model.dart';
-import 'package:sms_spam_detection/presentation/MatIcons.dart';
-import 'package:sms_spam_detection/presentation/StringConst.dart';
+import 'package:sms_spam_detection/presentation/styles.dart';
+import 'package:sms_spam_detection/sms/sms_service.dart';
+import 'package:sms_spam_detection/sqflite/SmsDatabase.dart';
 import 'package:sms_spam_detection/widgets/ChatMessage.dart';
+import 'package:sms_spam_detection/widgets/chat_input_widget.dart';
 
 class ChatScreen extends StatefulWidget {
-  final User user;
+  final int smsThreadId;
+  final String address;
 
-  ChatScreen({Key key, this.user}) : super(key: key);
+  ChatScreen(this.address, this.smsThreadId);
 
   @override
   State<StatefulWidget> createState() => ChatScreenState();
 }
 
 class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
-  final TextEditingController _textController = new TextEditingController();
-  final List<ChatMessage> _messages = <ChatMessage>[];
+//  final TextEditingController _textController = TextEditingController();
+  ScrollController scrollController = ScrollController();
 
-  bool _isComposing = false;
+  List<ChatMessage> _messages = [];
+  List<SmsMessage> smsMessages;
 
-  ChatMessage _buildChatThread(Thread thread) {
+  SmsThread thread;
+  SmsSender sender;
+
+  String title, subtitle;
+  Contact contact;
+
+  @override
+  void initState() {
+    title = widget.address;
+    sender = new SmsSender();
+    super.initState();
+
+    SmsDatabaseProvider.db
+        .getSmsMessagesByThreadId(widget.smsThreadId)
+        .then((value) {
+      if (mounted) {
+        setState(() {
+          smsMessages = value;
+          thread = SmsThread.fromMessages(smsMessages);
+        });
+      }
+
+      setReadMessages();
+    });
+
+    ContactsService.getContactsForPhone(widget.address).then((value) {
+      if (value != null && value.length > 0) {
+        contact = value.toList()[0];
+        title =
+        (contact.givenName != null) ? contact.givenName : widget.address;
+      } else {
+        title = widget.address;
+      }
+      subtitle = widget.address;
+      if (mounted) {
+        setState(() {
+          if (thread != null) {
+            thread.contact = contact;
+          } else {
+            thread = new SmsThread(widget.smsThreadId);
+            thread.contact = contact;
+          }
+        });
+      }
+    }, onError: (e) {
+      print('ContactQuery : Contact not found error : ${e.toString()}');
+    });
+  }
+
+  ChatMessage _buildChatThread(SmsMessage smsMessage) {
     final cm = ChatMessage(
-      thread,
+      smsMessage,
       AnimationController(
         vsync: this,
         duration: Duration(milliseconds: 500),
       ),
     );
-
     return cm;
   }
 
-  void _handleSubmitted(String text) {
-    _textController.clear();
+  _handleSubmitted(String text, TextEditingController textEditingController) {
+    textEditingController.clear();
     if (text != null && text.length > 0) {
-      DateTime now = DateTime.now();
-      String formattedDate = DateFormat('dd/mm/yyyy HH:mm:ss').format(now);
-      final Thread thread =
-          new Thread(fromSelf: true, message: text, time: formattedDate);
+      String address = widget.address;
 
-      ChatMessage message = _buildChatThread(thread);
+      final SmsMessage smsMessage =
+      new SmsMessage(address, text, threadId: widget.smsThreadId);
+      final ChatMessage message = _buildChatThread(smsMessage);
 
-      setState(() {
-        _messages.insert(0, message);
-        _isComposing = false;
+      smsMessage.onStateChanged.listen((event) {
+        switch (event) {
+          case SmsMessageState.Sent:
+            if (mounted) {
+              setState(() {
+                thread.addNewMessage(smsMessage);
+                smsMessages.insert(0, smsMessage);
+              });
+            }
+//            message.animationController.forward();
+            SmsDatabaseProvider.db
+                .setMessageState(smsMessage.id, SmsMessageState.Sent);
+            showToast('Message Sent');
+            break;
+
+          case SmsMessageState.Sending:
+            message.animationController.forward();
+            print("Sending");
+            SmsDatabaseProvider.db
+                .setMessageState(smsMessage.id, SmsMessageState.Sending);
+            break;
+          case SmsMessageState.Delivered:
+            showToast('Message Delivered');
+            SmsDatabaseProvider.db
+                .setMessageState(smsMessage.id, SmsMessageState.Delivered);
+            break;
+
+          case SmsMessageState.Fail:
+            showToast('Failed to sent');
+            SmsDatabaseProvider.db
+                .setMessageState(smsMessage.id, SmsMessageState.Fail);
+            break;
+
+          case SmsMessageState.None:
+            print("None");
+            SmsDatabaseProvider.db
+                .setMessageState(smsMessage.id, SmsMessageState.None);
+            break;
+        }
+      }, onError: (error) {
+        print("ChatScreen : smsMessage.onStateChanged : OnError ");
+      }, onDone: () {
+        print("ChatScreen : smsMessage.onStateChanged : onDone ");
       });
-      message.animationController.forward();
+
+      if (sender == null) {
+        sender = new SmsSender();
+      }
+      sender.sendSms(smsMessage);
+      SmsDatabaseProvider.db.addMessageToDatabase(smsMessage);
+      FocusScope.of(context).unfocus();
     }
   }
 
-  @override
-  void initState() {
-    final threads = [
-      Thread(
-          fromSelf: false, message: 'Hey Buddy !', time: '04/12/2019 12:23:23'),
-      Thread(
-          fromSelf: false, message: 'How are you', time: '04/12/2019 12:25:23'),
-      Thread(
-          fromSelf: true,
-          message: 'Absouletly well, How about you',
-          time: '04/12/2019 12:26:23'),
-      Thread(
-          fromSelf: false,
-          message: 'I m also fine, what are you doing these days',
-          time: '04/12/2019 12:29:23'),
-      Thread(
-          fromSelf: true,
-          message: 'Woring on android project',
-          time: '04/12/2019 12:30:23'),
-      Thread(
-          fromSelf: false, message: 'Hey Buddy !', time: '04/12/2019 12:23:23'),
-      Thread(
-          fromSelf: false, message: 'How are you', time: '04/12/2019 12:25:23'),
-      Thread(
-          fromSelf: true,
-          message: 'Absouletly well, How about you',
-          time: '04/12/2019 12:26:23'),
-      Thread(
-          fromSelf: false,
-          message: 'I m also fine, what are you doing these days',
-          time: '04/12/2019 12:29:23'),
-      Thread(
-          fromSelf: true,
-          message: 'Woring on android project',
-          time: '04/12/2019 12:30:23'),
-      Thread(
-          fromSelf: false, message: 'Hey Buddy !', time: '04/12/2019 12:23:23'),
-      Thread(
-          fromSelf: false, message: 'How are you', time: '04/12/2019 12:25:23'),
-      Thread(
-          fromSelf: true,
-          message: 'Absouletly well, How about you',
-          time: '04/12/2019 12:26:23'),
-      Thread(
-          fromSelf: false,
-          message: 'I m also fine, what are you doing these days',
-          time: '04/12/2019 12:29:23'),
-      Thread(
-          fromSelf: true,
-          message: 'Woring on android project',
-          time: '04/12/2019 12:30:23'),
-    ];
+  Widget buildChats() {
+    List<ChatScreenItem> chatScreenItems = getChatsByDate(smsMessages);
 
-    threads.forEach((thread) {
-      final cm = _buildChatThread(thread);
-      _messages.add(cm);
-      cm.animationController.forward();
-    });
-
-    super.initState();
+    return ListView.builder(
+      padding: EdgeInsets.only(top: 15.0),
+      reverse: true,
+      itemCount: (chatScreenItems != null && chatScreenItems.isNotEmpty)
+          ? chatScreenItems.length
+          : 0,
+      itemBuilder: (context, int index) {
+        final ChatScreenItem item = chatScreenItems[index];
+        if (item is DateItem) {
+          return item;
+        } else {
+          return item as ChatMessage;
+        }
+      },
+    );
   }
 
-  Widget _buildTextComposer() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(8, 4, 8, 8),
-      child: new Row(
-        children: <Widget>[
-          new Flexible(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Color(0xFFe7e7e7),
-                border: Border.all(color: Color(0xFFdbdbdb)),
-                borderRadius: BorderRadius.all(Radius.circular(25.0)),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: new TextField(
-                controller: _textController,
-                onChanged: (String text) {
-                  if (text != null) {
-                    setState(() {
-                      _isComposing = text.length > 0;
-                    });
-                  }
-                },
-                textCapitalization: TextCapitalization.sentences,
-                onSubmitted: _handleSubmitted,
-                decoration: new InputDecoration.collapsed(
-                  hintText: StringConst.sendMessage,
-                ),
-                maxLines: 4,
-                minLines: 1,
-                style: TextStyle(fontSize: 16, fontFamily: 'Roboto'),
-              ),
-            ),
-          ),
-          new IconButton(
-            icon: new Icon(
-              MatIcons.up,
-              color: Color(0xFFbdbdbd),
-            ),
-            onPressed: _isComposing
-                ? () => _handleSubmitted(_textController.text)
-                : null,
-          ),
-        ],
-      ),
-    );
+  String _getPrettyDate(DateTime iDate) {
+    DateTime cNow = DateTime.now();
+    Duration duration = cNow.difference(iDate);
+
+    if (duration
+        .abs()
+        .inDays == 0) {
+      if (iDate.day == cNow.day) {
+        return "Today";
+      }
+      return "Yesterday";
+    }
+
+    if (duration
+        .abs()
+        .inDays == 1) {
+      return "Yesterday";
+    }
+
+    return DateFormat("dd-MM-yyyy").format(iDate);
+  }
+
+  List<ChatScreenItem> getChatsByDate(List<SmsMessage> smsMessages) {
+    List<ChatScreenItem> items = [];
+
+    smsMessages.sort();
+
+    if (smsMessages != null && smsMessages.isNotEmpty) {
+      int i = 0,
+          j = 0;
+      for (i = 0; i < smsMessages.length;) {
+        SmsMessage iMessage = smsMessages[i];
+        DateTime iDate = iMessage.dateSent;
+
+        if (iMessage.kind == SmsMessageKind.Sent) {
+          iDate = iMessage.date;
+        }
+
+        ChatMessage iChat = _buildChatThread(iMessage);
+        items.add(iChat);
+        _messages.add(iChat);
+
+        String iDateStr = _getPrettyDate(iDate);
+        DateItem date = new DateItem(iDateStr);
+
+        for (j = i + 1; j < smsMessages.length; j++) {
+          SmsMessage jMessage = smsMessages[j];
+          DateTime jDate = jMessage.dateSent;
+
+          if (jMessage.kind == SmsMessageKind.Sent) {
+            jDate = jMessage.date;
+          }
+
+          ChatMessage jChat = _buildChatThread(jMessage);
+
+          Duration duration = iDate.difference(jDate);
+          if (duration
+              .abs()
+              .inDays == 0 && iDate.day == jDate.day) {
+            items.add(jChat);
+            _messages.add(jChat);
+          } else
+            break;
+        }
+        items.add(date);
+        i = j;
+      }
+    }
+
+    return items;
   }
 
   @override
   void dispose() {
-    for (ChatMessage message in _messages) {
-      message.animationController.dispose();
+    if (_messages != null && _messages.isNotEmpty) {
+      for (ChatMessage message in _messages) {
+        message.animationController.dispose();
+      }
     }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return new Scaffold(
-      backgroundColor: Theme.of(context).primaryColor,
-      appBar: getChatScreenAppBar(context, widget.user.name, '9999784555'),
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: Column(
-          children: <Widget>[
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(30.0),
-                    topRight: Radius.circular(30.0),
+    List<ChatScreenItem> chatScreenItems = [];
+    if (smsMessages != null && smsMessages.isNotEmpty) {
+      chatScreenItems.addAll(getChatsByDate(smsMessages));
+    }
+
+    return Scaffold(
+      appBar: getChatScreenAppBar(context, title, subtitle),
+      body: Container(
+          color: Theme
+              .of(context)
+              .primaryColor,
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Column(
+              children: <Widget>[
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(30.0),
+                        topRight: Radius.circular(30.0),
+                      ),
+                    ),
+                    child: Column(
+                      children: <Widget>[
+                        Flexible(
+                          child: Container(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(30.0),
+                                topRight: Radius.circular(30.0),
+                              ),
+//                              child: (smsMessages != null)
+//                                  ? Center(child: CircularProgressIndicator())
+                              child: (smsMessages != null)
+                                  ? (smsMessages.isEmpty)
+                                  ? Center(
+                                child: Text('No messages yet'),
+                              )
+                                  : ListView.builder(
+                                padding: EdgeInsets.only(top: 15.0),
+                                reverse: true,
+                                itemCount: (chatScreenItems != null &&
+                                    chatScreenItems.isNotEmpty)
+                                    ? chatScreenItems.length
+                                    : 0,
+                                itemBuilder: (context, int index) {
+                                  final ChatScreenItem item =
+                                  chatScreenItems[index];
+                                  if (item is DateItem) {
+                                    return item;
+                                  } else {
+                                    return item as ChatMessage;
+                                  }
+                                },
+                              )
+                                  : Center(child: Text('Importing Messages')),
+                            ),
+                          ),
+                        ), //LIST VIEW
+                        ChatInputWidget(
+                          active:
+                          !widget.address.contains(RegExp(r"([a-zA-Z])")),
+                          onSubmitted: (message, controller) {
+                            _handleSubmitted(message, controller);
+                          },
+                        )
+                      ],
+                    ),
                   ),
                 ),
-                child: Column(
-                  children: <Widget>[
-                    Expanded(
-                      child: Container(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(30.0),
-                            topRight: Radius.circular(30.0),
-                          ),
-                          child: new ListView.builder(
-                            padding: EdgeInsets.only(top: 15.0),
-                            reverse: true,
-                            itemCount: _messages.length,
-                            itemBuilder: (context, int index) {
-                              final ChatMessage message = _messages[index];
-                              return message;
-                            },
-                          ),
-                        ),
-                      ),
-                    ), //LIST VIEW
-                    _buildTextComposer(), //SEND MESSAGE BAR
-                  ],
-                ),
-              ),
+              ],
             ),
-          ],
-        ),
-      ),
+          )),
     );
   }
-}
 
-AppBar getChatScreenAppBar(BuildContext context, String name, String number) {
-  return AppBar(
-    centerTitle: true,
-    title: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        Text(
-          name,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          style: TextStyle(
-            color: Colors.white,
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
+  AppBar getChatScreenAppBar(BuildContext context, String name,
+      String address) {
+    return AppBar(
+      centerTitle: true,
+      title: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Text(
+            name,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            style: chatScreenTitleStyle,
           ),
-        ),
-        Text(
-          number,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          style: TextStyle(
-            fontFamily: 'Roboto',
-            fontWeight: FontWeight.bold,
-            color: Colors.white60,
-            fontSize: 12,
+          (address != null && address.length > 0 && address != name)
+              ? Text(
+            address,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            style: chatScreenSubtitleStyle,
+          )
+              : SizedBox.shrink(),
+        ],
+      ),
+      actions: <Widget>[
+        PopupMenuButton(
+          itemBuilder: (context) =>
+          [
+            PopupMenuItem(
+              child: Text("Info"),
+              value: "Info",
+            )
+          ],
+          icon: Icon(
+            Icons.more_vert,
+            color: Colors.white,
           ),
         ),
       ],
-    ),
-    actions: <Widget>[
-      IconButton(
-        icon: Icon(Icons.more_vert),
-        padding: EdgeInsets.only(right: 5.0),
-        onPressed: () {},
-      ),
-    ],
-    elevation: 0.0,
-  );
+      elevation: 0.0,
+    );
+  }
+
+  void showToast(String msg) {
+    Fluttertoast.showToast(
+      msg: msg,
+      toastLength: Toast.LENGTH_SHORT,
+      backgroundColor: Colors.black45,
+      textColor: Colors.white,
+    );
+  }
+
+  void setReadMessages() {
+    SmsDatabaseProvider.db.setThreadRead(thread.threadId);
+  }
 }

@@ -1,18 +1,143 @@
-import 'package:flutter/material.dart';
-import 'package:sms_spam_detection/presentation/MatColor.dart';
-import 'package:sms_spam_detection/screens/ChatScreen.dart';
-import 'package:sms_spam_detection/screens/InboxScreen.dart';
-import 'package:sms_spam_detection/screens/SpamScreen.dart';
-import 'package:sms_spam_detection/screens/UndecidableScreen.dart';
+import 'dart:convert';
 
-class Home extends StatelessWidget {
-  AppBar _getAppBar(BuildContext context) {
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:sms_spam_detection/presentation/MatColor.dart';
+import 'package:sms_spam_detection/screens/About.dart';
+import 'package:sms_spam_detection/screens/ChatScreen.dart';
+import 'package:sms_spam_detection/screens/Dashboard.dart';
+import 'package:sms_spam_detection/screens/Draft.dart';
+import 'package:sms_spam_detection/screens/Report.dart';
+import 'package:sms_spam_detection/screens/Setting.dart';
+import 'package:sms_spam_detection/screens/Test.dart';
+import 'package:sms_spam_detection/screens/select_contacts.dart';
+import 'package:sms_spam_detection/sms/contacts.dart';
+import 'package:sms_spam_detection/sms/sms_service.dart';
+import 'package:sms_spam_detection/widgets/DrawerItem.dart';
+
+class HomeScreen extends StatefulWidget {
+  final drawerItems = [
+    new DrawerItem("Home", Icons.home),
+    new DrawerItem("Draft", Icons.drafts),
+    new DrawerItem("Test", Icons.content_paste),
+//    new DrawerItem("Setting", Icons.settings),
+//    new DrawerItem("About", Icons.info_outline),
+//    new DrawerItem("Report", Icons.report)
+  ];
+
+  @override
+  _HomeState createState() => _HomeState();
+}
+
+class _HomeState extends State<HomeScreen> {
+  int _selectedDrawerIndex = 0;
+  bool isVisible = true;
+
+  _getDrawerItemWidget(int pos) {
+    switch (pos) {
+      case 0:
+        isVisible = true;
+        return new DashboardScreen();
+      case 1:
+        isVisible = true;
+        return new DraftScreen();
+      case 2:
+        isVisible = false;
+        return new TestScreen();
+      case 3:
+        isVisible = false;
+        return new SettingScreen();
+      case 4:
+        isVisible = false;
+        return new AboutScreen();
+      case 5:
+        isVisible = false;
+        return new ReportScreen();
+      default:
+        isVisible = true;
+        return new DashboardScreen();
+    }
+  }
+
+  _onSelectItem(int index) {
+    setState(() => _selectedDrawerIndex = index);
+    Navigator.of(context).pop(); // close the drawer
+  }
+
+  SmsReceiver _smsReceiver;
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin;
+
+  Future _showNotificationWithDefaultSound(SmsMessage m) async {
+    SmsMessage message = m;
+    int threadId = message.threadId;
+    String head = message.sender;
+    String body = message.body;
+    String payload = jsonEncode(message.toMap);
+
+    await ContactsService.getContactsForPhone(message.address).then((value) {
+      if (value != null && value.length > 0) {
+        Contact contact = value.toList()[0];
+        head = contact.givenName;
+      }
+    });
+
+    var androidPlatformChannelSpecifics = new AndroidNotificationDetails(
+        threadId.toString(), 'sms_spam', 'Spam Sms detection',
+        importance: Importance.Max, priority: Priority.High);
+    var iOSPlatformChannelSpecifics = new IOSNotificationDetails();
+    var platformChannelSpecifics = new NotificationDetails(
+        androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
+    await flutterLocalNotificationsPlugin.show(
+      threadId,
+      head,
+      body,
+      platformChannelSpecifics,
+      payload: payload,
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (_smsReceiver == null) {
+      _smsReceiver = new SmsReceiver();
+      _smsReceiver.onSmsReceived.listen((event) {
+        _showNotificationWithDefaultSound(event);
+      });
+    }
+
+    var initializationSettingsAndroid =
+    new AndroidInitializationSettings('@mipmap/ic_launcher');
+    var initializationSettingsIOS = new IOSInitializationSettings();
+    var initializationSettings = new InitializationSettings(
+        initializationSettingsAndroid, initializationSettingsIOS);
+    flutterLocalNotificationsPlugin = new FlutterLocalNotificationsPlugin();
+    flutterLocalNotificationsPlugin.initialize(initializationSettings,
+        onSelectNotification: onNotificationSelected);
+  }
+
+  Future<void> onNotificationSelected(String payload) async {
+    Map<String, dynamic> messageMap = jsonDecode(payload);
+    String address;
+    int threadId = -1;
+    if (messageMap.containsKey("address")) {
+      address = messageMap["address"];
+    }
+    if (messageMap.containsKey("thread_id")) {
+      threadId = messageMap["thread_id"];
+    }
+
+    if (address != null) {
+      Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (context) => ChatScreen(address, threadId)));
+    }
+  }
+
+  _getAppBar(BuildContext context) {
     return AppBar(
-      leading: IconButton(
-        icon: Icon(Icons.menu),
-        color: Colors.white,
-        onPressed: () {},
-      ),
       centerTitle: true,
       title: Text(
         'Sms Spam Detection',
@@ -28,97 +153,55 @@ class Home extends StatelessWidget {
         ),
       ],
       elevation: 0.0,
-      bottom: TabBar(
-        isScrollable: true,
-        labelStyle: TextStyle(
-            fontSize: 18, fontFamily: 'Lato', fontWeight: FontWeight.w500),
-        indicatorColor: Colors.transparent,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white54,
-        indicatorSize: TabBarIndicatorSize.label,
-        tabs: <Widget>[
-          Tab(text: 'Inbox'),
-          Tab(text: 'Undecidable'),
-          Tab(text: 'Spam'),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      initialIndex: 0,
-      child: Scaffold(
-        backgroundColor: Theme.of(context).primaryColor,
-        appBar: _getAppBar(context),
-        body: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(30.0),
-              topRight: Radius.circular(30.0),
-            ),
-          ),
-          child: TabBarView(
-            children: <Widget>[
-              InboxScreen(),
-              UndecidableScreen(),
-              SpamScreen(),
-            ],
-          ),
-        ),
-        floatingActionButton: _buildFloatingActionButton(
-          context,
-        ),
-      ),
     );
   }
 
   _buildFloatingActionButton(BuildContext context) {
-    return FloatingActionButton(
-      onPressed: () {
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) {
-          return SelectContact();
-        }));
-      },
-      child: Icon(
-        Icons.message,
-        color: MatColor.textColor,
+    return Visibility(
+      visible: isVisible,
+      child: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) {
+            return SelectContact();
+          }));
+        },
+        child: Icon(
+          Icons.message,
+          color: MatColor.textColor,
+        ),
       ),
     );
   }
-}
 
-class SelectContact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Select Contact'),
-        actions: <Widget>[
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: null,
-          ),
-        ],
+    var drawerOptions = <Widget>[];
+    for (var i = 0; i < widget.drawerItems.length; i++) {
+      var d = widget.drawerItems[i];
+      drawerOptions.add(new ListTile(
+        leading: new Icon(d.icon),
+        title: new Text(d.title),
+        selected: i == _selectedDrawerIndex,
+        onTap: () => _onSelectItem(i),
+      ));
+    }
+
+    return new Scaffold(
+      appBar: _getAppBar(context),
+      drawer: new Drawer(
+        child: new Column(
+          children: <Widget>[
+            new UserAccountsDrawerHeader(
+                currentAccountPicture: Image.asset('assets/images/logo.png'),
+                accountName: new Text("SMS Spam Detection"),
+                accountEmail: null),
+            new Column(children: drawerOptions)
+          ],
+        ),
       ),
-      body: ListView.builder(
-        itemBuilder: (context, index) {
-          return ListTile(
-            leading: CircleAvatar(
-              child: Icon(Icons.person),
-            ),
-            title: Text('contact $index'),
-            subtitle: Text('contact $index\'s status...'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.of(context).push(MaterialPageRoute(builder: (context) {
-                return ChatScreen();
-              }));
-            },
-          );
-        },
+      body: _getDrawerItemWidget(_selectedDrawerIndex),
+      floatingActionButton: _buildFloatingActionButton(
+        context,
       ),
     );
   }

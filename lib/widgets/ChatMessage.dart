@@ -1,45 +1,81 @@
 import 'package:flutter/material.dart';
-import 'package:sms_spam_detection/Models/Thread.dart';
+import 'package:flutter_widgets/flutter_widgets.dart';
+import 'package:intl/intl.dart';
 import 'package:sms_spam_detection/presentation/MatColor.dart';
+import 'package:sms_spam_detection/sms/sms_service.dart';
+import 'package:sms_spam_detection/sqflite/SmsDatabase.dart';
 
-class ChatMessage extends StatelessWidget {
-  final Thread thread;
-  final AnimationController animationController;
+abstract class ChatScreenItem {}
 
-  ChatMessage(this.thread, this.animationController);
+class DateItem extends StatelessWidget implements ChatScreenItem {
+  final String _date;
+
+  DateItem(this._date);
 
   @override
   Widget build(BuildContext context) {
-    return new SizeTransition(
-      sizeFactor: new CurvedAnimation(
-        parent: animationController,
-        curve: Curves.easeOut,
+    return Center(
+      child: Container(
+        margin: EdgeInsets.only(top: 10.0, bottom: 5.0),
+        padding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
+        decoration: BoxDecoration(
+          color: Colors.deepPurple,
+          borderRadius: BorderRadius.all(Radius.circular(8.0)),
+        ),
+        child: Text(
+          _date,
+          maxLines: 1,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.white,
+          ),
+        ),
       ),
-      axisAlignment: 0.0,
-      child: thread.fromSelf ? _RightThread(thread) : _LeftThread(thread),
     );
-//  return thread.fromSelf ? _RightThread(thread) : _LeftThread(thread);
   }
 }
 
-class _RightThread extends StatelessWidget {
-  final Thread thread;
-  final Color backgroundColor;
-  final double r;
+class ChatMessage extends StatefulWidget implements ChatScreenItem {
+  final SmsMessage smsMessage;
+  final AnimationController animationController;
 
-  _RightThread(this.thread,
-      {this.r = 2.5, this.backgroundColor = MatColor.primaryLightColor2});
+  ChatMessage(this.smsMessage, this.animationController);
+
+  @override
+  _ChatMessageState createState() => _ChatMessageState();
+}
+
+class _ChatMessageState extends State<ChatMessage> {
+  double cWidth;
 
   @override
   Widget build(BuildContext context) {
-    double c_width = MediaQuery.of(context).size.width * 0.2;
+    cWidth = MediaQuery
+        .of(context)
+        .size
+        .width * 0.2;
+
+    return widget.smsMessage.kind == SmsMessageKind.Received
+        ? _leftThread(widget.smsMessage)
+        : _rightThread(widget.smsMessage);
+  }
+
+  String _getDate(DateTime mTime) {
+    return DateFormat('hh:mm aa').format(mTime);
+  }
+
+  _rightThread(SmsMessage rMessage,
+      {radius = 2.5, backgroundColor = MatColor.primaryLightColor2}) {
+    String body = rMessage.body;
+    String time = _getDate(rMessage.date);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: <Widget>[
         Flexible(
           child: Container(
             margin: EdgeInsets.only(
-                top: 5.0, bottom: 5.0, left: c_width, right: 0.0),
+                top: 5.0, bottom: 5.0, left: cWidth, right: 0.0),
             padding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
             decoration: BoxDecoration(
               color: MatColor.primaryLightColor,
@@ -50,19 +86,26 @@ class _RightThread extends StatelessWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.max,
               children: <Widget>[
                 Text(
-                  thread.message,
+                  body,
                   softWrap: true,
                   style: TextStyle(),
                 ),
                 SizedBox(
                   height: 4.0,
                 ),
-                Text(
-                  thread.time,
-                  softWrap: true,
-                  style: TextStyle(fontSize: 10, color: Colors.black26),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      time,
+                      softWrap: true,
+                      style: TextStyle(fontSize: 10, color: Colors.black26),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -71,54 +114,57 @@ class _RightThread extends StatelessWidget {
       ],
     );
   }
-}
 
-class _LeftThread extends StatelessWidget {
-  final Thread thread;
-  final Color backgroundColor;
-  final double radius;
-
-  _LeftThread(this.thread,
-      {this.radius = 2.5, this.backgroundColor = MatColor.primaryLightColor3});
-
-  @override
-  Widget build(BuildContext context) {
-    final double c_width = MediaQuery.of(context).size.width * 0.2;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: <Widget>[
-        Flexible(
-          child: Container(
-            margin: EdgeInsets.only(top: 5.0, bottom: 5.0, right: c_width),
-            padding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
-            decoration: BoxDecoration(
-              color: MatColor.primaryLightColor2,
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(10.0),
-                bottomRight: Radius.circular(10.0),
+  _leftThread(SmsMessage lMessage,
+      {radius = 2.5, backgroundColor = MatColor.primaryLightColor2}) {
+    return VisibilityDetector(
+      key: Key('lMessageDetector'),
+      onVisibilityChanged: (info) {
+        print('${lMessage.id} Set Read : ${lMessage.isRead}');
+        if (!lMessage.isRead) {
+          SmsDatabaseProvider.db.setMessageRead(lMessage.id).then((value) {
+            print('${lMessage.id} value : $value');
+            lMessage.read = true;
+          });
+        }
+      },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: <Widget>[
+          Flexible(
+            child: Container(
+              margin: EdgeInsets.only(top: 5.0, bottom: 5.0, right: cWidth),
+              padding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
+              decoration: BoxDecoration(
+                color: MatColor.primaryLightColor2,
+                borderRadius: BorderRadius.only(
+                  topRight: Radius.circular(10.0),
+                  bottomRight: Radius.circular(10.0),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    lMessage.body,
+                    softWrap: true,
+                    style: TextStyle(),
+                  ),
+                  SizedBox(
+                    height: 4.0,
+                  ),
+                  Text(
+                    _getDate(lMessage.dateSent),
+                    softWrap: true,
+                    style: TextStyle(fontSize: 10, color: Colors.black26),
+                  ),
+                ],
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  thread.message,
-                  softWrap: true,
-                  style: TextStyle(),
-                ),
-                SizedBox(
-                  height: 4.0,
-                ),
-                Text(
-                  thread.time,
-                  softWrap: true,
-                  style: TextStyle(fontSize: 10, color: Colors.black26),
-                ),
-              ],
-            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
+

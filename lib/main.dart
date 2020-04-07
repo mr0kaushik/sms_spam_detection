@@ -1,18 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:sms_spam_detection/presentation/MatColor.dart';
+import 'package:sms_spam_detection/screens/ImportScreen.dart';
+import 'package:sms_spam_detection/screens/onboarding_screen.dart';
+import 'package:sms_spam_detection/screens/splash_screen.dart';
 
 import 'screens/Home.dart';
 
 void main() => runApp(MyApp());
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Spam SMS Detection',
       theme: kDefaultTheme,
-      home: Home(),
+      home: Splashscreen(),
+      routes: {
+        '/import': (context) => ImportedScreen(),
+        '/onboard': (context) => OnboardingScreen(),
+        '/home': (context) => HomeScreen(),
+      },
     );
   }
 
