@@ -1,5 +1,6 @@
 # Spam SMS Detection app
-An end Semester project of BTech
+An End sem project of BTech Computer Science Engineering (GB Pant Engineering College)
+It's my first Flutter project so its not much customer oriented.
 
 ### Download App : <a href="https://drive.google.com/file/d/1CgE91jSQZmhwucSUggNibHEYrLjPQHiC/view?usp=sharing">Click Here</a>
 
