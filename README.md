@@ -1,15 +1,11 @@
+![BuiltForAndroid](https://forthebadge.com/images/badges/built-for-android.svg)
+
 # Spam SMS Detection app
-An End sem project of BTech Computer Science Engineering (GB Pant Engineering College)
-It's my first Flutter project so its not much customer oriented.
+A Flutter application which will protect you from SPAM messages, it uses On Device Model from [TensorflowLite](https://www.tensorflow.org/lite) to filter sms messages, feel free to give it a try.
 
-### Download App : <a href="https://drive.google.com/file/d/1CgE91jSQZmhwucSUggNibHEYrLjPQHiC/view?usp=sharing">Click Here</a>
+![MadeWith-Flutter-Dart](https://img.shields.io/static/v1?label=Made%20With&message=Flutter%20|%20Dart%20|%20Tensorflow%20Lite%20|%20Keras&color=blue)
 
-#### What is it ?
-A Flutter application which will protect you from SPAM.
-
-#### Is it safe to use?
-Absolutely, It uses On Device Model from [TensorflowLite](https://www.tensorflow.org/lite) to filter your messages.
-
+### Wanna try ? : [Get apk](https://drive.google.com/file/d/1CgE91jSQZmhwucSUggNibHEYrLjPQHiC/view?usp=sharing)
 
 ## Features
 1. Import Messages: It will import all the messages from the device and assigned them
