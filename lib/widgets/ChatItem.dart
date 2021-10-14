@@ -87,11 +87,12 @@ class _ChatItemState extends State<ChatItem> {
     return GestureDetector(
       onTap: () {
         if (contact != null) {
+          String label = contact.displayName;
           Navigator.push(
               context,
               MaterialPageRoute(
                   builder: (context) => ChatScreen(
-                      contact.getPrimaryAddress(), widget._thread.threadId)));
+                      label, widget._thread.threadId)));
         } else {
           Navigator.push(
               context,

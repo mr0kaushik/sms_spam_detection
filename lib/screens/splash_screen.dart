@@ -56,7 +56,7 @@ class _SplashscreenState extends State<Splashscreen> {
                 Center(
                   child: Image(
                     image: AssetImage(
-                      'assets/images/logo.png',
+                      'assets/images/app_icon.png',
                     ),
                     height: 200.0,
                     width: 200.0,

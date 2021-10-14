@@ -113,7 +113,7 @@ class _ImportedScreenState extends State<ImportedScreen> {
             Flexible(
               child: Center(
                 child: Image.asset(
-                  "assets/images/logo.png",
+                  "assets/images/app_icon.png",
                   width: imageSize,
                   height: imageSize,
 //                  fit: BoxFit.cover,

@@ -83,7 +83,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           });
         }
         break;
-      case PermissionStatus.undetermined:
+      case PermissionStatus.limited:
       case PermissionStatus.restricted:
       case PermissionStatus.permanentlyDenied:
         if (mounted) {

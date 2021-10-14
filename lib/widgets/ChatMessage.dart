@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_widgets/flutter_widgets.dart';
+// import 'package:flutter_widgets/flutter_widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:sms_spam_detection/presentation/MatColor.dart';
 import 'package:sms_spam_detection/sms/sms_service.dart';
 import 'package:sms_spam_detection/sqflite/SmsDatabase.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 abstract class ChatScreenItem {}
 

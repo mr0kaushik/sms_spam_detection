@@ -82,11 +82,11 @@ class _HomeState extends State<HomeScreen> {
     });
 
     var androidPlatformChannelSpecifics = new AndroidNotificationDetails(
-        threadId.toString(), 'sms_spam', 'Spam Sms detection',
-        importance: Importance.Max, priority: Priority.High);
+        threadId.toString(), 'sms_spam', channelDescription: 'Spam Sms detection',
+        importance: Importance.max, priority: Priority.high);
     var iOSPlatformChannelSpecifics = new IOSNotificationDetails();
     var platformChannelSpecifics = new NotificationDetails(
-        androidPlatformChannelSpecifics, iOSPlatformChannelSpecifics);
+        android: androidPlatformChannelSpecifics, iOS: iOSPlatformChannelSpecifics);
     await flutterLocalNotificationsPlugin.show(
       threadId,
       head,
@@ -108,10 +108,10 @@ class _HomeState extends State<HomeScreen> {
     }
 
     var initializationSettingsAndroid =
-    new AndroidInitializationSettings('@mipmap/ic_launcher');
+    new AndroidInitializationSettings('app_icon');
     var initializationSettingsIOS = new IOSInitializationSettings();
     var initializationSettings = new InitializationSettings(
-        initializationSettingsAndroid, initializationSettingsIOS);
+        android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
     flutterLocalNotificationsPlugin = new FlutterLocalNotificationsPlugin();
     flutterLocalNotificationsPlugin.initialize(initializationSettings,
         onSelectNotification: onNotificationSelected);
@@ -192,7 +192,7 @@ class _HomeState extends State<HomeScreen> {
         child: new Column(
           children: <Widget>[
             new UserAccountsDrawerHeader(
-                currentAccountPicture: Image.asset('assets/images/logo.png'),
+                currentAccountPicture: Image.asset('assets/images/app_icon.png'),
                 accountName: new Text("SMS Spam Detection"),
                 accountEmail: null),
             new Column(children: drawerOptions)

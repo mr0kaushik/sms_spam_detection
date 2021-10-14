@@ -9,37 +9,45 @@ class ContactsService {
   static const MethodChannel _channel =
       MethodChannel('github.com/clovisnicolas/flutter_contacts');
 
-  static Future<Iterable<Contact>> getContacts(
+  static Future<List<Contact>> getContacts(
       {String query,
-      bool withThumbnails = true,
-      bool photoHighResolution = true,
-      bool orderByGivenName = true}) async {
+        bool withThumbnails = true,
+        bool photoHighResolution = true,
+        bool orderByGivenName = true,
+        bool iOSLocalizedLabels = true,
+        bool androidLocalizedLabels = true}) async {
     Iterable contacts =
-        await _channel.invokeMethod('getContacts', <String, dynamic>{
+    await _channel.invokeMethod('getContacts', <String, dynamic>{
       'query': query,
       'withThumbnails': withThumbnails,
       'photoHighResolution': photoHighResolution,
-      'orderByGivenName': orderByGivenName
+      'orderByGivenName': orderByGivenName,
+      'iOSLocalizedLabels': iOSLocalizedLabels,
+      'androidLocalizedLabels': androidLocalizedLabels,
     });
-    return contacts.map((m) => Contact.fromMap(m));
+    return contacts.map((m) => Contact.fromMap(m)).toList();
   }
 
   /// Fetches all contacts, or when specified, the contacts with a name
   /// matching [query]
-  static Future<Iterable<Contact>> getContactsForPhone(String phone,
+  static Future<List<Contact>> getContactsForPhone(String phone,
       {bool withThumbnails = true,
-      bool photoHighResolution = true,
-      bool orderByGivenName = true}) async {
-    if (phone == null || phone.isEmpty) return Iterable.empty();
+        bool photoHighResolution = true,
+        bool orderByGivenName = true,
+        bool iOSLocalizedLabels = true,
+        bool androidLocalizedLabels = true}) async {
+    if (phone == null || phone.isEmpty) return List.empty();
 
     Iterable contacts =
-        await _channel.invokeMethod('getContactsForPhone', <String, dynamic>{
+    await _channel.invokeMethod('getContactsForPhone', <String, dynamic>{
       'phone': phone,
       'withThumbnails': withThumbnails,
       'photoHighResolution': photoHighResolution,
-      'orderByGivenName': orderByGivenName
+      'orderByGivenName': orderByGivenName,
+      'iOSLocalizedLabels': iOSLocalizedLabels,
+      'androidLocalizedLabels': androidLocalizedLabels,
     });
-    return contacts.map((m) => Contact.fromMap(m));
+    return contacts.map((m) => Contact.fromMap(m)).toList();
   }
 
   /// Loads the avatar for the given contact and returns it. If the user does

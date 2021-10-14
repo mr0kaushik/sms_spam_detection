@@ -30,7 +30,7 @@ class _SelectContactState extends State<SelectContact> {
     ContactsService.getContacts(orderByGivenName: true).then((value) {
       if (mounted) {
         setState(() {
-          contacts = value.toList();
+          contacts = value;
           filteredContacts = contacts;
           showProgress = false;
         });
